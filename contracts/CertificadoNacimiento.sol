@@ -53,13 +53,13 @@ contract CertificadoNacimiento is Ownable{
     
     Certificado [] public certificados;
     address constant internal FIRST_ADDRESS = address(1);
-    
+    uint256 public countCert;
     // Diccionarios
     mapping(uint256 => Complemento) public complementos;
     mapping(address=>Usuario) public usuarios;
     mapping(address=>Instituto) public institutos;
-    mapping (uint256 => address) public certifcadoToOwner;
-    mapping (uint256 => address) public certifiedCreator; // Address del creador del certificado(Notario)
+    mapping(uint256 => address) public certifcadoToOwner;
+    mapping(uint256 => address) public certifiedCreator; // Address del creador del certificado(Notario)
     
     mapping(uint256 => mapping(address=> address)) internal listaInstitucionesXCertificado;
     mapping(address => mapping(address=> address)) internal listaCertificadosXInstituciones;
@@ -68,9 +68,9 @@ contract CertificadoNacimiento is Ownable{
     
     // Eventos
     event newCertificado(uint certificadoId, string nombre, address notario);
-    event newUsuario(string nombre, address notario);
-    event newInstituto(string nombre, address instituto);
-    event OwnershipTransferred(address indexed previousOwner,address indexed newOwner);
+    // event newUsuario(string nombre, address notario);
+    // event newInstituto(string nombre, address instituto);
+    // event OwnershipTransferred(address indexed previousOwner,address indexed newOwner);
 
     // Modificadores
     modifier onlyNotario(address _direccion) {
@@ -91,11 +91,14 @@ contract CertificadoNacimiento is Ownable{
         require(institutos[_direccion].direccion==address(0),"La direccion ya tiene una cuenta de instituto");
         _;
     }
-    // modifier onlyTrue(address _institucion, uint256 _certificadoId){
-    //     require(certificados[_certificadoId].active==true,"No se puede compartir un certificado no activo");
-    //     require(institutos[_institucion].verified ==true,"No se puede compartir a un instituto no verificado");
-    //     _;
-    // }
+    modifier onlyUser(address _direccion){
+        require(usuarios[_direccion].direccion==_direccion,"La direccion no pertenece a un usuario");
+        _;
+    }
+    modifier onlyInstituto(address _direccion){
+        require(institutos[_direccion].direccion==_direccion,"La direccion no pertenece a un instituto");
+        _;
+    }
     
     // Constructor
     constructor() public {
@@ -112,17 +115,21 @@ contract CertificadoNacimiento is Ownable{
         n_user.email = _email;
         n_user.listSizeInstituciones=0;
         usuarios[msg.sender]=n_user;
-        emit newUsuario(_nombre,msg.sender);
+        // emit newUsuario(_nombre,msg.sender);
     }
     
-    function roleNotario(address _direccion)public onlyOwner{
-        Usuario storage notario = usuarios[_direccion];
-        notario.role="notario";
-    }
-    
-    function validarInstitucion(address _direccion) public onlyNotario(msg.sender){
-        Instituto storage instituto = institutos[_direccion];
-        instituto.verified=true;
+    function crearInstituto(string memory _nombre,string memory _telefono,string memory _email) public onlyInstitutoByAddress(msg.sender){
+         Instituto memory n_instituto;
+         n_instituto.direccion = msg.sender;
+         n_instituto.nombre = _nombre;
+         n_instituto.telefono = _telefono;
+         n_instituto.email = _email;
+         n_instituto.verified = false;
+         n_instituto.listSizeCertificados=0;
+         institutos[msg.sender] = n_instituto;
+         
+         listaCertificadosXInstituciones[msg.sender][FIRST_ADDRESS]=FIRST_ADDRESS;
+        //  emit newInstituto(_nombre,msg.sender);
     }
     
     function createCertificado(string memory _departamento,uint256 _fecha,string memory _nombre,
@@ -139,6 +146,7 @@ contract CertificadoNacimiento is Ownable{
         nCertificado.nombre_madre = _nombre_madre;
         certificados.push(nCertificado);
         certifcadoToOwner[certificados.length - 1] = msg.sender;
+        countCert++;
         certifiedCreator[certificados.length -1] =  msg.sender;
         
         listaInstitucionesXCertificado[certificados.length - 1][FIRST_ADDRESS]=FIRST_ADDRESS;
@@ -156,33 +164,47 @@ contract CertificadoNacimiento is Ownable{
         nComplemento.nota_aclaratoria = _nota_aclaratoria;
         complementos[_certificadoId]= nComplemento;
     }
+
+    function setUser(string memory _nombre, string memory _email) public onlyUser(msg.sender){
+        Usuario storage n_user = usuarios[msg.sender];
+        n_user.nombre = _nombre;
+        n_user.email = _email;
+    }
     
-    function crearInstituto(string memory _nombre,string memory _telefono,string memory _email) public onlyInstitutoByAddress(msg.sender){
-         Instituto memory n_instituto;
-         n_instituto.direccion = msg.sender;
+    function setInstitucion(string memory _nombre,string memory _telefono,string memory _email) public onlyInstituto(msg.sender){
+         Instituto storage n_instituto=institutos[msg.sender];
          n_instituto.nombre = _nombre;
          n_instituto.telefono = _telefono;
          n_instituto.email = _email;
-         n_instituto.verified = false;
-         n_instituto.listSizeCertificados=0;
-         institutos[msg.sender] = n_instituto;
-         
-         listaCertificadosXInstituciones[msg.sender][FIRST_ADDRESS]=FIRST_ADDRESS;
-         emit newInstituto(_nombre,msg.sender);
     }
     
-    function setCertificate(uint256 _certificadoId,string memory _departamento,uint256 _fecha,string memory _nombre,
-    string memory _departamento_nacimiento, uint256 _fecha_nacimiento,bool _sexo,
-    string memory _nombre_padre,string memory _nombre_madre) public onlyNotario(msg.sender){
-        Certificado storage nCertificado = certificados[_certificadoId];
-        nCertificado.departamento =_departamento;
-        nCertificado.fecha = _fecha;
-        nCertificado.nombre = _nombre;
-        nCertificado.departamento_nacimiento = _departamento_nacimiento;
-        nCertificado.fecha_naciminto = _fecha_nacimiento;
-        nCertificado.sexo = _sexo;
-        nCertificado.nombre_padre = _nombre_padre;
-        nCertificado.nombre_madre = _nombre_madre;
+    // function setCertificate(uint256 _certificadoId,string memory _departamento,uint256 _fecha,string memory _nombre,
+    // string memory _departamento_nacimiento, uint256 _fecha_nacimiento,bool _sexo,
+    // string memory _nombre_padre,string memory _nombre_madre) public onlyNotario(msg.sender){
+    //     Certificado storage nCertificado = certificados[_certificadoId];
+    //     nCertificado.departamento =_departamento;
+    //     nCertificado.fecha = _fecha;
+    //     nCertificado.nombre = _nombre;
+    //     nCertificado.departamento_nacimiento = _departamento_nacimiento;
+    //     nCertificado.fecha_naciminto = _fecha_nacimiento;
+    //     nCertificado.sexo = _sexo;
+    //     nCertificado.nombre_padre = _nombre_padre;
+    //     nCertificado.nombre_madre = _nombre_madre;
+    // }
+
+    function roleNotario(address _direccion)public onlyOwner{
+        Usuario storage notario = usuarios[_direccion];
+        notario.role="notario";
+    }
+    
+    function setValidarInstitucion(address _direccion,bool valor) public onlyNotario(msg.sender){
+        Instituto storage instituto = institutos[_direccion];
+        instituto.verified=valor;
+    }
+    
+    function setActive(uint256 _certificadoId, bool _active) public onlyNotario(msg.sender){
+        Certificado storage _certificado = certificados[_certificadoId];
+        _certificado.active = _active;
     }
     
     function getCertificadoByOwner(address _owner) public view returns(uint256,bool) {
@@ -198,32 +220,24 @@ contract CertificadoNacimiento is Ownable{
     }
     
     function transferCertificado(address _newOwner,uint256 _certificadoId) public onlyNotario(msg.sender) {
-        _transferCertificado(_newOwner,_certificadoId);
-    }
-    
-    function _transferCertificado(address _newOwner,uint256 _certificadoId) internal {
         require(_newOwner != address(0),"La nueva direccion es válida");
         Certificado storage _certificado = certificados[_certificadoId];
         _certificado.active = true;
         certifcadoToOwner[_certificadoId]= _newOwner;
         
-        emit OwnershipTransferred(owner, _newOwner);
-    }
-    
-    function setActive(uint256 _certificadoId, bool _active,address _notario) public onlyNotario(_notario){
-        Certificado storage _certificado = certificados[_certificadoId];
-        _certificado.active = _active;
+        // emit OwnershipTransferred(owner, _newOwner);
     }
     
     function compartirCertificado(uint256 _certificadoId, address _institucion) public onlyOwnerCertificate(_certificadoId,msg.sender){
+     require(certificados[_certificadoId].active==true,"El certificado no esta activo");
+     require(institutos[_institucion].verified==true, "La institucion no esta verificada");
       addListCertificado(_institucion,_certificadoId);
       
-      address owner = certifcadoToOwner[_certificadoId];
     //   ownerToCerfificado[owner] =_certificadoId;
-      addListInstitucion(owner,_institucion);
+      addListInstitucion(certifcadoToOwner[_certificadoId],_institucion);
     }
     
-    function desCompartirCertificado(uint256 _certificadoId, address _institucion) public returns(bool){
+    function desCompartirCertificado(uint256 _certificadoId, address _institucion) public{
         removeListCertificado(_institucion,_certificadoId);
         
         address owner = certifcadoToOwner[_certificadoId];
@@ -320,6 +334,4 @@ contract CertificadoNacimiento is Ownable{
         }
         return usersArray;
     }
-    
-    
 }
