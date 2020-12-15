@@ -2,7 +2,6 @@ pragma solidity ^0.5.0;
 import "./ownable.sol";
 contract CertificadoNacimiento is Ownable{
     
-    // Variables
     
     // Estructuras
     struct Certificado{
@@ -21,7 +20,7 @@ contract CertificadoNacimiento is Ownable{
         // string provincia_nacimiento;
         // string localidad_nacimiento;
         uint256 fecha_naciminto; // timestamp
-        bool sexo; // 0:masculino, 1:femenino
+        bool genero; // 0:masculino, 1:femenino
         string nombre_padre; // Nombre completo
         string nombre_madre; // Nombre completo
         bool active;
@@ -33,6 +32,7 @@ contract CertificadoNacimiento is Ownable{
         uint256 partida;
         uint256 folio;
         string serie;
+        uint256 fecha_partida;
         string nota_aclaratoria;
     }
     struct Usuario{
@@ -40,7 +40,7 @@ contract CertificadoNacimiento is Ownable{
         address direccion;
         string role;
         string email;
-        uint32 listSizeInstituciones;
+        uint256 listSizeInstituciones;
     }
     struct Instituto{
         address direccion;
@@ -51,23 +51,23 @@ contract CertificadoNacimiento is Ownable{
         uint256 listSizeCertificados;
     }
     
+    // Variables
+    
     Certificado [] public certificados;
     address constant internal FIRST_ADDRESS = address(1);
     uint256 public countCert;
-    // Diccionarios
     mapping(uint256 => Complemento) public complementos;
     mapping(address=>Usuario) public usuarios;
     mapping(address=>Instituto) public institutos;
     mapping(uint256 => address) public certifcadoToOwner;
     mapping(uint256 => address) public certifiedCreator; // Address del creador del certificado(Notario)
-    
     mapping(uint256 => mapping(address=> address)) internal listaInstitucionesXCertificado;
     mapping(address => mapping(address=> address)) internal listaCertificadosXInstituciones;
     
     
     
     // Eventos
-    event newCertificado(uint certificadoId, string nombre, address notario);
+    // event newCertificado(uint certificadoId, string nombre, address notario);
     // event newUsuario(string nombre, address notario);
     // event newInstituto(string nombre, address instituto);
     // event OwnershipTransferred(address indexed previousOwner,address indexed newOwner);
@@ -133,7 +133,7 @@ contract CertificadoNacimiento is Ownable{
     }
     
     function createCertificado(string memory _departamento,uint256 _fecha,string memory _nombre,
-    string memory _departamento_nacimiento, uint256 _fecha_nacimiento,bool _sexo,
+    string memory _departamento_nacimiento, uint256 _fecha_nacimiento,bool _genero,
     string memory _nombre_padre,string memory _nombre_madre) public onlyNotario(msg.sender){
         Certificado memory nCertificado;
         nCertificado.departamento =_departamento;
@@ -141,20 +141,20 @@ contract CertificadoNacimiento is Ownable{
         nCertificado.nombre = _nombre;
         nCertificado.departamento_nacimiento = _departamento_nacimiento;
         nCertificado.fecha_naciminto = _fecha_nacimiento;
-        nCertificado.sexo = _sexo;
+        nCertificado.genero = _genero;
         nCertificado.nombre_padre = _nombre_padre;
         nCertificado.nombre_madre = _nombre_madre;
         certificados.push(nCertificado);
-        certifcadoToOwner[certificados.length - 1] = msg.sender;
+        certifcadoToOwner[certificados.length - 1] = address(0);
         countCert++;
         certifiedCreator[certificados.length -1] =  msg.sender;
         
         listaInstitucionesXCertificado[certificados.length - 1][FIRST_ADDRESS]=FIRST_ADDRESS;
-        emit newCertificado(certificados.length -1, _nombre,msg.sender);
+        // emit newCertificado(certificados.length -1, _nombre,msg.sender);
     }
     
     function crearComplemento(uint256 _oficialia,string memory _libro, uint256 _partida, 
-    uint256 _folio,string memory _serie,string memory _nota_aclaratoria,uint256 _certificadoId) public onlyNotario(msg.sender){
+    uint256 _folio,string memory _serie,string memory _nota_aclaratoria,uint256 _fecha_partida,uint256 _certificadoId) public onlyNotario(msg.sender){
         Complemento memory nComplemento;
         nComplemento.oficialia = _oficialia;
         nComplemento.libro = _libro;
@@ -162,6 +162,7 @@ contract CertificadoNacimiento is Ownable{
         nComplemento.folio = _folio;
         nComplemento.serie = _serie;
         nComplemento.nota_aclaratoria = _nota_aclaratoria;
+        nComplemento.fecha_partida= _fecha_partida;
         complementos[_certificadoId]= nComplemento;
     }
 
@@ -178,20 +179,6 @@ contract CertificadoNacimiento is Ownable{
          n_instituto.email = _email;
     }
     
-    // function setCertificate(uint256 _certificadoId,string memory _departamento,uint256 _fecha,string memory _nombre,
-    // string memory _departamento_nacimiento, uint256 _fecha_nacimiento,bool _sexo,
-    // string memory _nombre_padre,string memory _nombre_madre) public onlyNotario(msg.sender){
-    //     Certificado storage nCertificado = certificados[_certificadoId];
-    //     nCertificado.departamento =_departamento;
-    //     nCertificado.fecha = _fecha;
-    //     nCertificado.nombre = _nombre;
-    //     nCertificado.departamento_nacimiento = _departamento_nacimiento;
-    //     nCertificado.fecha_naciminto = _fecha_nacimiento;
-    //     nCertificado.sexo = _sexo;
-    //     nCertificado.nombre_padre = _nombre_padre;
-    //     nCertificado.nombre_madre = _nombre_madre;
-    // }
-
     function roleNotario(address _direccion)public onlyOwner{
         Usuario storage notario = usuarios[_direccion];
         notario.role="notario";
@@ -219,8 +206,8 @@ contract CertificadoNacimiento is Ownable{
         return (resultado,valido);
     }
     
-    function transferCertificado(address _newOwner,uint256 _certificadoId) public onlyNotario(msg.sender) {
-        require(_newOwner != address(0),"La nueva direccion es válida");
+    function transferCertificado(address _newOwner,uint256 _certificadoId) public onlyNotario(msg.sender) onlyUser(_newOwner){
+        require(_newOwner != address(0),"La nueva direccion no es válida");
         Certificado storage _certificado = certificados[_certificadoId];
         _certificado.active = true;
         certifcadoToOwner[_certificadoId]= _newOwner;
@@ -237,7 +224,7 @@ contract CertificadoNacimiento is Ownable{
       addListInstitucion(certifcadoToOwner[_certificadoId],_institucion);
     }
     
-    function desCompartirCertificado(uint256 _certificadoId, address _institucion) public{
+    function desCompartirCertificado(uint256 _certificadoId, address _institucion) public onlyOwnerCertificate(_certificadoId,msg.sender){
         removeListCertificado(_institucion,_certificadoId);
         
         address owner = certifcadoToOwner[_certificadoId];
@@ -334,4 +321,18 @@ contract CertificadoNacimiento is Ownable{
         }
         return usersArray;
     }
+    
+       // function setCertificate(uint256 _certificadoId,string memory _departamento,uint256 _fecha,string memory _nombre,
+    // string memory _departamento_nacimiento, uint256 _fecha_nacimiento,bool _sexo,
+    // string memory _nombre_padre,string memory _nombre_madre) public onlyNotario(msg.sender){
+    //     Certificado storage nCertificado = certificados[_certificadoId];
+    //     nCertificado.departamento =_departamento;
+    //     nCertificado.fecha = _fecha;
+    //     nCertificado.nombre = _nombre;
+    //     nCertificado.departamento_nacimiento = _departamento_nacimiento;
+    //     nCertificado.fecha_naciminto = _fecha_nacimiento;
+    //     nCertificado.sexo = _sexo;
+    //     nCertificado.nombre_padre = _nombre_padre;
+    //     nCertificado.nombre_madre = _nombre_madre;
+    // }
 }
