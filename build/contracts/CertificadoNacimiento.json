@@ -34158,12 +34158,13 @@
         }
       },
       "links": {},
-      "address": "0x008317D5D43645c058Dc484c04d553C0272c3608",
-      "transactionHash": "0x6523256d13a9583ff4880c9a709f0dd27f03100ef78d66ca59a3b07a9a5d669b"
+      "address": "0x746f032B1d111f292D4d45Bf8017E531c8983f14",
+      "transactionHash": "0x88fcd7170e5b07301357e5ce3117493ec30ca28adaa147ef1a3571db6e9b8b72"
     }
   },
   "schemaVersion": "3.2.5",
-  "updatedAt": "2020-12-15T06:04:19.077Z",
+  "updatedAt": "2020-12-17T21:54:00.786Z",
+  "networkType": "ethereum",
   "devdoc": {
     "methods": {}
   },
